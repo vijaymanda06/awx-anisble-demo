@@ -1,32 +1,28 @@
 ---
-- name: 🛠️ PRE-STEP - Download SSM Plugin Binary
+- name: 🚀 Deploy via Pure SSM (Agent Mode)
   hosts: localhost
   connection: local
   gather_facts: false
-  tasks:
-    - name: Download and unpack SSM binary to a local path
-      shell: |
-        curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/linux_64bit/session-manager-plugin.rpm" -o "ssm.rpm"
-        rpm2cpio ssm.rpm | cpio -idmv
-        # Move the binary to the current project folder so Ansible can find it
-        cp ./usr/local/bin/session-manager-plugin ./session-manager-plugin
-      args:
-        chdir: "/tmp"
-      ignore_errors: yes
-
-- name: 🚀 MAIN-STEP - Deploy Showcase App
-  hosts: all
-  become: yes
   vars:
-    # This tells Ansible exactly where the "plugin" is sitting
-    ansible_aws_ssm_plugin_path: "/tmp/session-manager-plugin"
+    # This automatically grabs the Instance IDs from your AWX Inventory
+    target_instances: "{{ groups['all'] }}"
+    
   tasks:
-    - name: Ensure Docker container is running
-      community.docker.docker_container:
-        name: showcase-app
-        image: hashicorp/http-echo
-        state: started
-        restart_policy: always
-        command: "-text='<h1>🚀 DevOps Success!</h1><p>Managed via AWX SSM Tunnel</p>'"
-        published_ports:
-          - "8080:5678"
+    - name: 📡 Send Docker Instruction to AWS SSM Agents
+      community.aws.ssm_send_command:
+        instance_ids: "{{ target_instances }}"
+        region: us-east-1  # Change if your servers are elsewhere
+        document_name: "AWS-RunShellScript"
+        parameters:
+          commands:
+            # 1. Pull the image
+            - "sudo docker pull hashicorp/http-echo"
+            # 2. Kill old container if it exists (prevents conflict errors)
+            - "sudo docker rm -f showcase-app || true"
+            # 3. Run the new container
+            - "sudo docker run -d --name showcase-app -p 8080:5678 hashicorp/http-echo -text='<h1>🚀 DevOps Success!</h1><p>Managed via AWX Pure SSM</p>'"
+      register: ssm_result
+
+    - name: ✅ Command Sent Successfully
+      debug:
+        msg: "Instruction sent to {{ target_instances | length }} servers. Request ID: {{ ssm_result.command_id }}"
