@@ -1,25 +1,54 @@
 ---
-- name: 🚀 Deploy via Pure SSM (Agent Mode)
+- name: 🚀 Deploy via Raw Python (Boto3) - The Bulletproof Fix
   hosts: localhost
   connection: local
-  gather_facts: false
+  gather_facts: no
   vars:
-    # This automatically grabs the Instance IDs from your inventory
-    target_instances: "{{ groups['all'] }}"
-    
-  tasks:
-    - name: 📡 Send Docker Instruction to AWS SSM Agents
-      amazon.aws.ssm_send_command:  # <--- Changed from community.aws to amazon.aws
-        instance_ids: "{{ target_instances }}"
-        region: us-east-1
-        document_name: "AWS-RunShellScript"
-        parameters:
-          commands:
-            - "sudo docker pull hashicorp/http-echo"
-            - "sudo docker rm -f showcase-app || true"
-            - "sudo docker run -d --name showcase-app -p 8080:5678 hashicorp/http-echo -text='<h1>🚀 DevOps Success!</h1><p>Managed via AWX Pure SSM</p>'"
-      register: ssm_result
+    # Get the list of Instance IDs from your inventory
+    instance_list: "{{ groups['all'] | join(' ') }}"
 
-    - name: ✅ Command Sent Successfully
+  tasks:
+    - name: 📝 Create Python Deployment Script
+      copy:
+        dest: "/tmp/deploy_ssm.py"
+        content: |
+          import boto3
+          import sys
+          import time
+
+          # 1. Get Instance IDs passed from Ansible
+          instance_ids = sys.argv[1].split()
+          region = 'us-east-1'
+
+          print(f"🚀 Target Instances: {instance_ids}")
+
+          # 2. Connect to AWS SSM
+          ssm = boto3.client('ssm', region_name=region)
+
+          # 3. The Docker Command
+          commands = [
+              "sudo docker pull hashicorp/http-echo",
+              "sudo docker rm -f showcase-app || true",
+              "sudo docker run -d --name showcase-app -p 8080:5678 hashicorp/http-echo -text='<h1>🚀 DevOps Success!</h1><p>Deployed via Raw Python & Boto3</p>'"
+          ]
+
+          # 4. Send the Command
+          try:
+              response = ssm.send_command(
+                  InstanceIds=instance_ids,
+                  DocumentName="AWS-RunShellScript",
+                  Parameters={'commands': commands}
+              )
+              cmd_id = response['Command']['CommandId']
+              print(f"✅ Success! Command ID: {cmd_id}")
+          except Exception as e:
+              print(f"❌ Failed: {str(e)}")
+              sys.exit(1)
+
+    - name: 📡 Execute Deployment Script
+      command: "python3 /tmp/deploy_ssm.py '{{ instance_list }}'"
+      register: deploy_output
+
+    - name: 📄 Show Result
       debug:
-        msg: "Instruction sent to {{ target_instances | length }} servers. Request ID: {{ ssm_result.command_id }}"
+        msg: "{{ deploy_output.stdout_lines }}"
