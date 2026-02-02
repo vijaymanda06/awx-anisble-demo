@@ -4,22 +4,19 @@
   connection: local
   gather_facts: false
   vars:
-    # This automatically grabs the Instance IDs from your AWX Inventory
+    # This automatically grabs the Instance IDs from your inventory
     target_instances: "{{ groups['all'] }}"
     
   tasks:
     - name: 📡 Send Docker Instruction to AWS SSM Agents
-      community.aws.ssm_send_command:
+      amazon.aws.ssm_send_command:  # <--- Changed from community.aws to amazon.aws
         instance_ids: "{{ target_instances }}"
-        region: us-east-1  # Change if your servers are elsewhere
+        region: us-east-1
         document_name: "AWS-RunShellScript"
         parameters:
           commands:
-            # 1. Pull the image
             - "sudo docker pull hashicorp/http-echo"
-            # 2. Kill old container if it exists (prevents conflict errors)
             - "sudo docker rm -f showcase-app || true"
-            # 3. Run the new container
             - "sudo docker run -d --name showcase-app -p 8080:5678 hashicorp/http-echo -text='<h1>🚀 DevOps Success!</h1><p>Managed via AWX Pure SSM</p>'"
       register: ssm_result
 
