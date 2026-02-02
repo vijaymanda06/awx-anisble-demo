@@ -1,0 +1,14 @@
+---
+- name: Deploy Showcase App via SSM
+  hosts: all
+  become: yes
+  tasks:
+    - name: Ensure Docker container is running
+      community.docker.docker_container:
+        name: showcase-app
+        image: hashicorp/http-echo
+        state: started
+        restart_policy: always
+        command: "-text='<h1>🚀 Success!</h1><p>Managed by Vijay via AWX & GitHub</p>'"
+        published_ports:
+          - "8080:5678"
