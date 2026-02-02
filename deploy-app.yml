@@ -1,39 +1,54 @@
 ---
-- name: 🚀 Deploy via Raw Python (Boto3) - The Bulletproof Fix
+- name: 🚀 Deploy via Raw Python (The "Silver Bullet" Fix)
   hosts: localhost
   connection: local
   gather_facts: no
+  become: false
   vars:
-    # Get the list of Instance IDs from your inventory
+    # Join the list of IPs into a single string
     instance_list: "{{ groups['all'] | join(' ') }}"
 
   tasks:
     - name: 📝 Create Python Deployment Script
       copy:
         dest: "/tmp/deploy_ssm.py"
+        mode: '0755'
         content: |
           import boto3
           import sys
           import time
 
-          # 1. Get Instance IDs passed from Ansible
-          instance_ids = sys.argv[1].split()
-          region = 'us-east-1'
+          # 1. Parse Instance IDs
+          try:
+              instance_ids = sys.argv[1].split()
+              if not instance_ids:
+                  print("❌ No instance IDs found!")
+                  sys.exit(1)
+          except IndexError:
+               print("❌ No instance IDs passed!")
+               sys.exit(1)
 
+          region = 'us-east-1'
           print(f"🚀 Target Instances: {instance_ids}")
 
           # 2. Connect to AWS SSM
-          ssm = boto3.client('ssm', region_name=region)
+          # We use the existing credentials in the environment
+          try:
+              ssm = boto3.client('ssm', region_name=region)
+          except Exception as e:
+              print(f"❌ AWS Connection Failed: {str(e)}")
+              sys.exit(1)
 
-          # 3. The Docker Command
+          # 3. The Docker Command to run on EC2
           commands = [
               "sudo docker pull hashicorp/http-echo",
               "sudo docker rm -f showcase-app || true",
-              "sudo docker run -d --name showcase-app -p 8080:5678 hashicorp/http-echo -text='<h1>🚀 DevOps Success!</h1><p>Deployed via Raw Python & Boto3</p>'"
+              "sudo docker run -d --name showcase-app -p 8080:5678 hashicorp/http-echo -text='<h1>🚀 DevOps Success!</h1><p>Deployed via AWX Boto3 Bypass</p>'"
           ]
 
           # 4. Send the Command
           try:
+              print("📡 Sending command to fleet...")
               response = ssm.send_command(
                   InstanceIds=instance_ids,
                   DocumentName="AWS-RunShellScript",
@@ -42,11 +57,12 @@
               cmd_id = response['Command']['CommandId']
               print(f"✅ Success! Command ID: {cmd_id}")
           except Exception as e:
-              print(f"❌ Failed: {str(e)}")
+              print(f"❌ Failed to send command: {str(e)}")
               sys.exit(1)
 
     - name: 📡 Execute Deployment Script
-      command: "python3 /tmp/deploy_ssm.py '{{ instance_list }}'"
+      # creates: Use the python that Ansible is using (which definitely has boto3)
+      command: "{{ ansible_playbook_python }} /tmp/deploy_ssm.py '{{ instance_list }}'"
       register: deploy_output
 
     - name: 📄 Show Result
