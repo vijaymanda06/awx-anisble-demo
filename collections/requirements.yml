@@ -2,3 +2,4 @@
 collections:
   - name: community.docker
   - name: community.aws
+  - name: amazon.aws  # <--- This is the missing piece!
