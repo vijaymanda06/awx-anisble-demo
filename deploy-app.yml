@@ -1,5 +1,19 @@
 ---
-- name: Deploy Showcase App via SSM
+- name: 🛠️ PRE-STEP - Install SSM Plugin on AWX Controller
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Download and Install SSM Plugin for the AWX Pod
+      shell: |
+        curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/linux_64bit/session-manager-plugin.rpm" -o "ssm.rpm"
+        rpm -i --nodeps ssm.rpm
+      args:
+        creates: /usr/local/bin/session-manager-plugin
+      become: true
+      ignore_errors: yes
+
+- name: 🚀 MAIN-STEP - Deploy Showcase App to Servers
   hosts: all
   become: yes
   tasks:
@@ -9,6 +23,6 @@
         image: hashicorp/http-echo
         state: started
         restart_policy: always
-        command: "-text='<h1>🚀 Success!</h1><p>Managed by Vijay via AWX & GitHub</p>'"
+        command: "-text='<h1>🚀 DevOps Success!</h1><p>Managed via AWX SSM Tunnel</p>'"
         published_ports:
           - "8080:5678"
