@@ -1,21 +1,25 @@
 ---
-- name: 🛠️ PRE-STEP - Install SSM Plugin on AWX Controller
+- name: 🛠️ PRE-STEP - Download SSM Plugin Binary
   hosts: localhost
   connection: local
   gather_facts: false
   tasks:
-    - name: Download and Install SSM Plugin for the AWX Pod
+    - name: Download and unpack SSM binary to a local path
       shell: |
         curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/linux_64bit/session-manager-plugin.rpm" -o "ssm.rpm"
-        rpm -i --nodeps ssm.rpm
+        rpm2cpio ssm.rpm | cpio -idmv
+        # Move the binary to the current project folder so Ansible can find it
+        cp ./usr/local/bin/session-manager-plugin ./session-manager-plugin
       args:
-        creates: /usr/local/bin/session-manager-plugin
-      become: true
+        chdir: "/tmp"
       ignore_errors: yes
 
-- name: 🚀 MAIN-STEP - Deploy Showcase App to Servers
+- name: 🚀 MAIN-STEP - Deploy Showcase App
   hosts: all
   become: yes
+  vars:
+    # This tells Ansible exactly where the "plugin" is sitting
+    ansible_aws_ssm_plugin_path: "/tmp/session-manager-plugin"
   tasks:
     - name: Ensure Docker container is running
       community.docker.docker_container:
