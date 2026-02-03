@@ -1,0 +1,18 @@
+---
+- name: Enterprise Docker Deployment
+  hosts: localhost  # SSM runs this locally on each instance
+  become: yes
+  tasks:
+    - name: Ensure Docker is running
+      service:
+        name: docker
+        state: started
+
+    - name: Deploy Showcase Container
+      community.docker.docker_container:
+        name: enterprise-app
+        image: nginx:alpine
+        state: started
+        restart_policy: always
+        ports:
+          - "8080:80"
