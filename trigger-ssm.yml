@@ -5,8 +5,10 @@
   tasks:
     - name: 📡 Wake up SSM Association
       amazon.aws.aws_ssm_association_execution:
-        association_id: "YOUR_ASSOCIATION_ID" # Get this from the State Manager console
+        # Use your exact ID here
+        association_id: "a92127cf-65ae-46be-a8d3-c503b3c20214"
         region: us-east-1
+      delegate_to: localhost
       environment:
         AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
         AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
