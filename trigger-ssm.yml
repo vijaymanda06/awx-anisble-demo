@@ -1,14 +1,25 @@
 ---
-- name: 🚀 Trigger Enterprise GitOps Deployment
+- name: 🚀 Trigger Enterprise GitOps Deployment (Safe Mode)
   hosts: localhost
   gather_facts: no
   tasks:
-    - name: 📡 Wake up SSM Association
-      amazon.aws.aws_ssm_association_execution:
-        # Use your exact ID here
-        association_id: "a92127cf-65ae-46be-a8d3-c503b3c20214"
-        region: us-east-1
-      delegate_to: localhost
+    - name: 📡 Wake up SSM Association via Boto3
+      shell: |
+        python3 -c "
+        import boto3, os
+        client = boto3.client('ssm', region_name='us-east-1')
+        response = client.start_associations_once(
+            InstanceIds=[], 
+            AssociationIds=['a92127cf-65ae-46be-a8d3-c503b3c20214']
+        )
+        print(response)
+        "
       environment:
         AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
         AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
+        AWS_SESSION_TOKEN: "{{ lookup('env', 'AWS_SESSION_TOKEN') | default('', true) }}"
+      register: trigger_output
+
+    - name: ✅ Show Result
+      debug:
+        msg: "AWS Association Triggered Successfully!"
