@@ -1,23 +1,25 @@
 ---
-- name: 🚀 Standard Playbook Test (No Boto3)
+- name: 🚀 Standard CLI Test (Bypassing Connection Plugins)
   hosts: all
   gather_facts: no
-  connection: local  # This keeps the execution on the AWX pod
+  # We REMOVE connection: local from here
   
   tasks:
-    - name: 📡 Run Docker via AWS SSM CLI
+    - name: 📡 Run Docker via AWS CLI (Delegated)
       shell: |
         aws ssm send-command \
           --document-name "AWS-RunShellScript" \
           --instance-ids "{{ inventory_hostname }}" \
           --region us-east-1 \
-          --parameters 'commands=["sudo docker run -d --name alpine-python python:3.11-alpine sleep 3600"]'
+          --parameters 'commands=["sudo docker pull python:3.11-alpine", "sudo docker run -d --name alpine-python python:3.11-alpine sleep 3600"]'
+      # This forces the task to run on the AWX pod's shell
+      delegate_to: localhost
       environment:
         AWS_ACCESS_KEY_ID: "{{ lookup('env', 'AWS_ACCESS_KEY_ID') }}"
         AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'AWS_SECRET_ACCESS_KEY') }}"
         AWS_SESSION_TOKEN: "{{ lookup('env', 'AWS_SESSION_TOKEN') | default('', true) }}"
       register: ssm_out
 
-    - name: ✅ Show SSM Command ID
+    - name: ✅ Verify Command Sent
       debug:
-        msg: "Command sent to {{ inventory_hostname }}. ID: {{ (ssm_out.stdout | from_json).Command.CommandId }}"
+        msg: "Success! Check your EC2 for the alpine-python container."
